@@ -25,7 +25,7 @@ def bolt():
     trees         = model["learner"]["gradient_booster"]["model"]["trees"]
 
     res  = "#include <stdbool.h>\n\n"
-    res += "float {}({})\n{{".format(args.function, ", ".join(["{} {}".format(feature_types[i], fname) for i, fname in enumerate(feature_names)]))
+    res += "float {}({})\n{{\n".format(args.function, ", ".join(["{} {}".format(feature_types[i], fname) for i, fname in enumerate(feature_names)]))
     for tree in trees:
         t = Tree(
             feature_types,
