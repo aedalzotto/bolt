@@ -1,9 +1,22 @@
+from argparse import ArgumentParser
 from json import load
 from .tree import Tree
 
 def bolt():
-    fname = "teste.json"
-    with open(fname) as f:
+    parser = ArgumentParser(description="Boost Learning Transpiler")
+    parser.add_argument("INPUT",            help="Input JSON")
+    parser.add_argument("-o", "--output",   help="Output file (default: INPUT.c)", default=None)
+    parser.add_argument("-f", "--function", help="Function name (default: INPUT)", default=None)
+    args = parser.parse_args()
+
+    mname = args.INPUT.split('.')[0]
+    if args.output is None:
+        args.output = "{}.c".format(mname)
+
+    if args.function is None:
+        args.function = mname
+
+    with open(args.INPUT) as f:
         model = load(f)
 
     feature_types = [x if x != "i" else "bool" for x in model["learner"]["feature_types"]]
@@ -11,9 +24,8 @@ def bolt():
 
     trees = model["learner"]["gradient_booster"]["model"]["trees"]
 
-    mname = fname.split(".")[0]
     res  = "#include <stdbool.h>\n\n"
-    res += "float {}({})\n{{".format(mname, ", ".join(["{} {}".format(feature_types[i], fname) for i, fname in enumerate(feature_names)]))
+    res += "float {}({})\n{{".format(args.function, ", ".join(["{} {}".format(feature_types[i], fname) for i, fname in enumerate(feature_names)]))
     for tree in trees:
         t = Tree(
             feature_types,
@@ -24,5 +36,5 @@ def bolt():
     res += "\treturn {} + {};\n".format(0.5, " + ".join("w{}".format(i) for i in range(len(trees))))
     res += "}}\n".format()
 
-    with open("{}.c".format(mname), "w") as f:
+    with open(args.output, "w") as f:
         f.write(res)
