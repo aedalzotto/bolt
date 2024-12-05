@@ -1,12 +1,14 @@
 from argparse import ArgumentParser
 from json import load
+from math import log2
 from .tree import Tree
 
 def bolt():
     parser = ArgumentParser(description="Boost Learning Transpiler")
-    parser.add_argument("INPUT",            help="Input JSON")
-    parser.add_argument("-o", "--output",   help="Output file   (default: INPUT.c)", default=None)
-    parser.add_argument("-f", "--function", help="Function name (default: INPUT)",   default=None)
+    parser.add_argument("INPUT",                help="Input JSON")
+    parser.add_argument("-o", "--output",       help="Output file   (default: INPUT.c)", default=None)
+    parser.add_argument("-f", "--function",     help="Function name (default: INPUT)",   default=None)
+    parser.add_argument("-q", "--quantization", help="Quantization scalar",              default=None)
     args = parser.parse_args()
 
     mname = args.INPUT.split('.')[0]
@@ -25,16 +27,30 @@ def bolt():
     trees         = model["learner"]["gradient_booster"]["model"]["trees"]
 
     res  = "#include <stdbool.h>\n\n"
-    res += "float {}({})\n{{\n".format(args.function, ", ".join(["{} {}".format(feature_types[i], fname) for i, fname in enumerate(feature_names)]))
+
+    if args.quantization is not None:
+        base_score = round(base_score*int(args.quantization))
+        res += "int "
+        for tree in trees:
+            for i, child in enumerate(tree["left_children"]):
+                if child == -1:
+                    tree["split_conditions"][i] = round(tree["split_conditions"][i] * int(args.quantization))
+    else:
+        rest += "float "
+
+    res += "{}({})\n{{\n".format(args.function, ", ".join(["{} {}".format(feature_types[i], fname) for i, fname in enumerate(feature_names)]))
     for tree in trees:
         t = Tree(
+            args.quantization is not None,
             feature_types,
             feature_names, 
             tree
         )
         res += t.gen()+"\n"
-    res += "\treturn {} + {};\n".format(base_score, " + ".join("w{}".format(i) for i in range(len(trees))))
-    res += "}}\n".format()
+    res += "\treturn ({} + {})".format(base_score, " + ".join("w{}".format(i) for i in range(len(trees))))
+    if args.quantization is not None:
+        res += " >> {}".format(int(log2(int(args.quantization))))
+    res += ";\n}\n"
 
     with open(args.output, "w") as f:
         f.write(res)

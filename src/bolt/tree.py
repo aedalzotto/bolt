@@ -1,5 +1,6 @@
 class Tree:
-    def __init__(self, feature_types, feature_names, tree):
+    def __init__(self, quantized, feature_types, feature_names, tree):
+        self.quantized        = quantized
         self.feature_types    = feature_types
         self.feature_names    = feature_names
         self.id               = tree["id"]
@@ -9,7 +10,7 @@ class Tree:
         self.right_children   = tree["right_children"]
 
     def gen(self):
-        ret  = "\tfloat w{};\n".format(self.id)
+        ret  = "\t{} w{};\n".format("int" if self.quantized else "float", self.id)
         ret += self.__add_node(0, 1)
         return ret
     
@@ -25,10 +26,10 @@ class Tree:
         
         # Otherwise is split
         right = self.right_children[index]
-        return "{}if ({} {}) {{\n{}\n{}}} else {{\n{}\n{}}}".format(
+        return "{}if ({}{}) {{\n{}\n{}}} else {{\n{}\n{}}}".format(
             tab,
             self.feature_names[self.split_indices[index]],
-            "" if self.feature_types[self.split_indices[index]] == "bool" else "< {}".format(self.split_conditions[index]),
+            "" if self.feature_types[self.split_indices[index]] == "bool" else " < {}".format(self.split_conditions[index]),
             self.__add_node(left, depth+1),
             tab,
             self.__add_node(right, depth+1),
