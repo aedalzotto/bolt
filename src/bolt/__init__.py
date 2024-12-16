@@ -9,6 +9,7 @@ def bolt():
     parser.add_argument("-o", "--output",       help="Output file   (default: INPUT.c)", default=None)
     parser.add_argument("-f", "--function",     help="Function name (default: INPUT)",   default=None)
     parser.add_argument("-q", "--quantization", help="Quantization scalar",              default=None)
+    parser.add_argument("-u", "--undummify",    help="Convert dummies to labels", action="store_true")
     args = parser.parse_args()
 
     mname = args.INPUT.split('.')[0]
@@ -22,10 +23,32 @@ def bolt():
         model = load(f)
 
     base_score    = float(model["learner"]["learner_model_param"]["base_score"])
-    feature_types = [x if x != "i" else "bool" for x in model["learner"]["feature_types"]]
     feature_names = model["learner"]["feature_names"]
     trees         = model["learner"]["gradient_booster"]["model"]["trees"]
+    feature_types = [x if x != "i" else "bool" for x in model["learner"]["feature_types"]]
+    operator      = ["<" if x != "bool" else "==" for x in feature_types]
+    if not args.undummify:
+        for tree in trees:
+            for j, idx in enumerate(tree["split_indices"]):
+                if feature_types[idx] == "bool":
+                    tree["split_conditions"][j] = 1
+    else:
+        for i, type in enumerate(feature_types):
+            if type == "bool":
+                feature_types[i] = "int"
+                dummy = "".join(feature_names[i].split("_")[:-1])
+                val   = feature_names[i].split("_")[-1]
+                feature_names[i] = dummy
+                for tree in trees:
+                    for j, idx in enumerate(tree["split_indices"]):
+                        if idx == i:
+                            tree["split_conditions"][j] = val
 
+    for tree in trees:
+        for j, idx in enumerate(tree["split_indices"]):
+            if feature_types[idx] == "int":
+                tree["split_conditions"][j] = int(tree["split_conditions"][j])
+                
     res  = "#include <stdbool.h>\n\n"
 
     if args.quantization is not None:
@@ -36,14 +59,15 @@ def bolt():
                 if child == -1:
                     tree["split_conditions"][i] = round(tree["split_conditions"][i] * int(args.quantization))
     else:
-        rest += "float "
+        res += "float "
 
-    res += "{}({})\n{{\n".format(args.function, ", ".join(["{} {}".format(feature_types[i], fname) for i, fname in enumerate(feature_names)]))
+    res += "{}({})\n{{\n".format(args.function, ", ".join(["{} {}".format(feature_types[i], fname) for i, fname in enumerate(list(dict.fromkeys(feature_names)))]))
     for tree in trees:
         t = Tree(
-            args.quantization is not None,
             feature_types,
             feature_names, 
+            "float" if args.quantization is None else "int",
+            operator, 
             tree
         )
         res += t.gen()+"\n"
