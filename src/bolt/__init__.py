@@ -5,11 +5,11 @@ from .tree import Tree
 
 def bolt():
     parser = ArgumentParser(description="Boost Learning Transpiler")
-    parser.add_argument("INPUT",                help="Input JSON")
-    parser.add_argument("-o", "--output",       help="Output file   (default: INPUT.c)", default=None)
-    parser.add_argument("-f", "--function",     help="Function name (default: INPUT)",   default=None)
-    parser.add_argument("-q", "--quantization", help="Quantization scalar",              default=None)
-    parser.add_argument("-u", "--undummify",    help="Convert dummies to labels", action="store_true")
+    parser.add_argument("INPUT",                    help="Input JSON")
+    parser.add_argument("-o", "--output",           help="Output file   (default: INPUT.c)", default=None)
+    parser.add_argument("-f", "--function",         help="Function name (default: INPUT)",   default=None)
+    parser.add_argument("-q", "--quantization",     help="Quantization scalar",              default=None)
+    parser.add_argument("-c", "--collapse-dummies", help="Convert dummies to labels", action="store_true")
     args = parser.parse_args()
 
     mname = args.INPUT.split('.')[0]
