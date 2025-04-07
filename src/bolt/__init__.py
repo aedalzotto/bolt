@@ -14,7 +14,7 @@ def bolt():
 
     mname = args.INPUT.split('.')[0]
     if args.output is None:
-        args.output = "{}.c".format(mname)
+        args.output = "{}.h".format(mname)
 
     if args.function is None:
         args.function = mname
@@ -27,7 +27,7 @@ def bolt():
     trees         = model["learner"]["gradient_booster"]["model"]["trees"]
     feature_types = [x if x != "i" else "bool" for x in model["learner"]["feature_types"]]
     operator      = ["<" if x != "bool" else "==" for x in feature_types]
-    if not args.undummify:
+    if not args.collapse_dummies:
         for tree in trees:
             for j, idx in enumerate(tree["split_indices"]):
                 if feature_types[idx] == "bool":
