@@ -46,9 +46,9 @@ def bolt():
 
     for tree in trees:
         for j, idx in enumerate(tree["split_indices"]):
-            if feature_types[idx] == "int":
+            if feature_types[idx] == "int" and tree["left_children"][j] != -1:
                 tree["split_conditions"][j] = int(tree["split_conditions"][j])
-                
+    
     res  = "#include <stdbool.h>\n\n"
 
     if args.quantization is not None:
