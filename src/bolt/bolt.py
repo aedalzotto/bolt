@@ -1,0 +1,91 @@
+from json import load
+from math import log2, ceil
+from .tree import Tree
+
+class Bolt:
+    def __init__(self, fname):
+        with open(fname) as f:
+            model = load(f)
+
+        self.base_score    = float(model["learner"]["learner_model_param"]["base_score"])
+        self.feature_names = model["learner"]["feature_names"]
+        self.feature_types = [x if x != "i" else "bool" for x in model["learner"]["feature_types"]]
+        self.trees         = model["learner"]["gradient_booster"]["model"]["trees"]
+        self.operator      = ["<" if x != "bool" else "==" for x in self.feature_types]
+        self.return_type   = "float"
+        self.shift         = 0
+
+        for tree in self.trees:
+            for j, idx in enumerate(tree["split_indices"]):
+                if self.feature_types[idx] == "bool":
+                    tree["split_conditions"][j] = 1
+
+    def quantize_leaves(self, scalar):
+        self.return_type = "int"
+        self.base_score  = round(self.base_score * int(scalar))
+        self.shift       = int(log2(int(scalar)))
+
+        for tree in self.trees:
+            for i, child in enumerate(tree["left_children"]):
+                if child == -1:
+                    tree["split_conditions"][i] = round(tree["split_conditions"][i] * int(scalar))
+
+    def collapse_dummies(self):
+        pop_idx = []
+        for i, type in enumerate(self.feature_types):
+            if type == "bool":
+                dummy = "".join(self.feature_names[i].split("_")[:-1])
+                val = int(self.feature_names[i].split("_")[-1])
+                if dummy in self.feature_names:
+                    feature_index = self.feature_names.index(dummy)
+                    pop_idx.append(i)
+                else:
+                    feature_index = i
+                    self.feature_types[i] = "int"
+                    self.feature_names[i] = dummy
+                
+                for tree in self.trees:
+                    for j, idx in enumerate(tree["split_indices"]):
+                        if idx == i and tree["left_children"][j] != -1:
+                            tree["split_indices"]   [j] = feature_index
+                            tree["split_conditions"][j] = val
+
+        for i in reversed(pop_idx):
+            self.feature_names.pop(i)
+            self.feature_types.pop(i)
+
+    def minimize_int(self):
+        for i, type in enumerate(self.feature_types):
+            if type == "int":
+                values = [tree["split_conditions"][j] for tree in self.trees for j, idx in enumerate(tree["split_indices"]) if idx == i and tree["left_children"][j] != -1]
+                if len(values) > 0:
+                    min_val = min(values)
+                    max_val = max(values)
+                    max_val = max(abs(min_val), max_val)
+                    nbits = ceil(log2(max_val)) + (1 if min_val < 0 else 0)
+                else:
+                    min_val = 0
+                    nbits = 0
+                nbits = min(i for i in [64,32,16,8] if i >= nbits)
+                self.feature_types[i] = "{}int{}_t".format("u" if min_val >= 0 else "", nbits)
+
+    def generate(self, function):
+        self.res  = "#include <stdbool.h>\n"
+        self.res += "#include <stdint.h>\n\n"
+
+        self.res += "{} {}({})\n{{\n".format(self.return_type, function, ", ".join(["{} {}".format(self.feature_types[i], fname) for i, fname in enumerate(list(dict.fromkeys(self.feature_names)))]))
+        for tree in self.trees:
+            t = Tree(
+                self.feature_types,
+                self.feature_names, 
+                self.return_type, 
+                self.operator, 
+                tree
+            )
+            self.res += t.gen()+"\n"
+        self.res += "\treturn ({} + {}){};\n".format(self.base_score, " + ".join("w{}".format(i) for i in range(len(self.trees))), " >> {}".format(self.shift) if self.shift != 0 else "")
+        self.res += "}\n"
+
+    def write(self, output):
+        with open(output, "w") as f:
+            f.write(self.res)
