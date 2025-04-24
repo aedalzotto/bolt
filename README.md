@@ -132,3 +132,14 @@ To enable leaf quantization, run:
 bolt input.json -q 256
 ```
 Where the value after the `-q` switch is a power-of-2 value to multiply every weight.
+
+### Integer minimization
+
+Internally XGBoost represents everything as 'float', 'int', or 'int64_t'.
+In C, we may want to represent some feature inputs as smaller integers, such as uint8_t, uint16_t, int8_t and int16_t.
+The integer minimization options scans all values used by integers and changes the feature inputs to the miminium size.
+
+To enable integer minimization, run:
+```
+bolt input.json -m
+```
