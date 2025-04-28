@@ -10,6 +10,7 @@ class Bolt:
         self.base_score    = float(model["learner"]["learner_model_param"]["base_score"])
         self.feature_names = model["learner"]["feature_names"]
         self.feature_types = [x if x != "i" else "bool" for x in model["learner"]["feature_types"]]
+        self.internal_type = [x if x != "i" else "bool" for x in model["learner"]["feature_types"]]
         self.trees         = model["learner"]["gradient_booster"]["model"]["trees"]
         self.operator      = ["<" if x != "bool" else "==" for x in self.feature_types]
         self.return_type   = "float"
@@ -42,6 +43,7 @@ class Bolt:
                 else:
                     feature_index = i
                     self.feature_types[i] = "int"
+                    self.internal_type[i] = "int"
                     self.feature_names[i] = dummy
                 
                 for tree in self.trees:
@@ -53,6 +55,7 @@ class Bolt:
         for i in reversed(pop_idx):
             self.feature_names.pop(i)
             self.feature_types.pop(i)
+            self.internal_type.pop(i)
 
     def minimize_int(self):
         for i, type in enumerate(self.feature_types):
@@ -67,16 +70,31 @@ class Bolt:
                     min_val = 0
                     nbits = 0
                 nbits = min(i for i in [64,32,16,8] if i >= nbits)
-                self.feature_types[i] = "{}int{}_t".format("u" if min_val >= 0 else "", nbits)
+                self.internal_type[i] = "{}int{}_t".format("u" if min_val >= 0 else "", nbits)
 
     def generate(self, function):
         self.res  = "#include <stdbool.h>\n"
         self.res += "#include <stdint.h>\n\n"
 
-        self.res += "{} {}({})\n{{\n".format(self.return_type, function, ", ".join(["{} {}".format(self.feature_types[i], fname) for i, fname in enumerate(list(dict.fromkeys(self.feature_names)))]))
+        self.res += "#define MIN(a, b) ((a) < (b) ? (a) : (b))\n"
+        self.res += "#define MAX(a, b) ((a) > (b) ? (a) : (b))\n"
+        self.res += "#define UINT8_MIN 0\n"
+        self.res += "#define UINT16_MIN 0\n"
+        self.res += "#define UINT32_MIN 0\n\n"
+
+        self.res += "{} {}({})\n{{\n".format(self.return_type, function, ", ".join(["{} {}{}".format(self.feature_types[i], "f" if self.feature_types[i] != self.internal_type[i] else "", fname) for i, fname in enumerate(list(dict.fromkeys(self.feature_names)))]))
+
+        quantized = False
+        for i in range(len(self.feature_names)):
+            if self.feature_types[i] != self.internal_type[i]:
+                quantized = True
+                self.res += "\t{} {} = MIN(MAX({}_MIN, f{}), {}_MAX);\n".format(self.internal_type[i], self.feature_names[i], self.internal_type[i].split("_")[0].upper(), self.feature_names[i], self.internal_type[i].split("_")[0].upper())
+
+        if quantized:
+            self.res += "\n"
+
         for tree in self.trees:
             t = Tree(
-                self.feature_types,
                 self.feature_names, 
                 self.return_type, 
                 self.operator, 

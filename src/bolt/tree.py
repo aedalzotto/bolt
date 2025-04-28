@@ -1,6 +1,5 @@
 class Tree:
-    def __init__(self, feature_types, feature_names, leaf_type, operator, tree):
-        self.feature_types    = feature_types
+    def __init__(self, feature_names, leaf_type, operator, tree):
         self.feature_names    = feature_names
         self.leaf_type        = leaf_type
         self.operator         = operator
