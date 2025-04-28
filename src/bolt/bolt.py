@@ -12,12 +12,24 @@ class Bolt:
         self.feature_types = [x if x != "i" else "bool" for x in model["learner"]["feature_types"]]
         self.internal_type = [x if x != "i" else "bool" for x in model["learner"]["feature_types"]]
         self.offset        = [0 for x in model["learner"]["feature_types"]]
-        self.trees         = model["learner"]["gradient_booster"]["model"]["trees"]
         self.operator      = ["<" if x != "bool" else "==" for x in self.feature_types]
         self.return_type   = "float"
         self.shift         = 0
 
+        self.trees = model["learner"]["gradient_booster"]["model"]["trees"]
         for tree in self.trees:
+            del tree["base_weights"]
+            del tree["categories"]
+            del tree["categories_nodes"]
+            del tree["categories_segments"]
+            del tree["categories_sizes"]
+            del tree["default_left"]
+            del tree["loss_changes"]
+            del tree["parents"]
+            del tree["split_type"]
+            del tree["sum_hessian"]
+            del tree["tree_param"]
+
             for j, idx in enumerate(tree["split_indices"]):
                 if self.feature_types[idx] == "bool":
                     tree["split_conditions"][j] = 1
@@ -93,9 +105,28 @@ class Bolt:
                     for j, idx in enumerate(tree["split_indices"]):
                         if idx == i and tree["left_children"][j] != -1:
                             tree["split_conditions"][j] = tree["split_conditions"][j] - min_val
-                    
+    
+    def __build_rodata(self):
+        self.conditions    = {}
+        for name in self.feature_names:
+            self.conditions[name] = []
 
-    def generate(self, function):
+        for tree in self.trees:
+            tree["cond_indices"] = [-1 for i in tree["split_indices"]]
+
+            for j, idx in enumerate(tree["split_indices"]):
+                if tree["left_children"][j] != -1:
+                    val = tree["split_conditions"][j]
+                    if val in self.conditions[self.feature_names[idx]]:
+                        val_index = self.conditions[self.feature_names[idx]].index(val)
+                    else:
+                        self.conditions[self.feature_names[idx]].append(val)
+                        val_index = len(self.conditions[self.feature_names[idx]]) - 1
+                    tree["cond_indices"][j] = val_index
+
+    def generate(self, function, loc="rodata"):
+        self.__build_rodata()
+
         self.res  = "#include <stdbool.h>\n"
         self.res += "#include <stdint.h>\n\n"
 
@@ -104,6 +135,15 @@ class Bolt:
         self.res += "#define UINT8_MIN 0\n"
         self.res += "#define UINT16_MIN 0\n"
         self.res += "#define UINT32_MIN 0\n\n"
+
+        if loc == "rodata":
+            for i, name in enumerate(self.feature_names):
+                if len(self.conditions[name]) == 0:
+                    continue
+                self.res += "const {} cond_{}[] = {{\n".format(self.internal_type[i], name)
+                for condition in self.conditions[name]:
+                    self.res += "\t{},\n".format(condition)
+                self.res += "};\n\n"
 
         self.res += "{} {}({})\n{{\n".format(
             self.return_type, 
@@ -141,9 +181,14 @@ class Bolt:
                 self.feature_names, 
                 self.return_type, 
                 self.operator, 
+                self.conditions, 
                 tree
             )
-            self.res += t.gen()+"\n"
+            if loc == "text":
+                self.res += t.gen_text()+"\n"
+            elif loc == "rodata":
+                self.res += t.gen_rodata()+"\n"
+
         self.res += "\treturn ({} + {}){};\n".format(self.base_score, " + ".join("w{}".format(i) for i in range(len(self.trees))), " >> {}".format(self.shift) if self.shift != 0 else "")
         self.res += "}\n"
 

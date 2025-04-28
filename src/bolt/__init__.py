@@ -4,6 +4,7 @@ from .bolt import Bolt
 def bolt():
     parser = ArgumentParser(description="Boost Learning Transpiler")
     parser.add_argument("INPUT",                       help="Input JSON")
+    parser.add_argument("LOCATION",                    help="Split conditions location: text or rodata", choices=["text", "rodata"])
     parser.add_argument("-o", "--output",              help="Output file   (default: INPUT.c)",      default=None)
     parser.add_argument("-f", "--function",            help="Function name (default: INPUT)",        default=None)
     parser.add_argument("-q", "--quantize-leaves",     help="Leaf quantization scalar (power of 2)", default=None)
@@ -33,5 +34,5 @@ def bolt():
     if args.linear_quantization:
         bolt.linear_quantization()
     
-    bolt.generate(args.function)
+    bolt.generate(args.function, loc=args.LOCATION)
     bolt.write(args.output)
