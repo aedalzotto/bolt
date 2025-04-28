@@ -155,3 +155,16 @@ To enable linear quantization, run:
 ```
 bolt input.json -l
 ```
+
+### Split conditions location
+
+XGBoost performs comparison to trained feature weights.
+These are the split conditions.
+Bolt allows choosing between placing these split conditions directly as literals inside the if condition, potentially 
+resulting in loading immediates, or placing these split conditions in a const array, potentially resulting in loading
+these values directly from memory.
+
+To enable placing split conditions in .rodata, run:
+```
+bolt input.json -r
+```

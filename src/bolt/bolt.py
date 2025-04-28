@@ -124,7 +124,7 @@ class Bolt:
                         val_index = len(self.conditions[self.feature_names[idx]]) - 1
                     tree["cond_indices"][j] = val_index
 
-    def generate(self, function, loc="rodata"):
+    def generate(self, function, rodata=False):
         self.__build_rodata()
 
         self.res  = "#include <stdbool.h>\n"
@@ -136,7 +136,7 @@ class Bolt:
         self.res += "#define UINT16_MIN 0\n"
         self.res += "#define UINT32_MIN 0\n\n"
 
-        if loc == "rodata":
+        if rodata:
             for i, name in enumerate(self.feature_names):
                 if len(self.conditions[name]) == 0:
                     continue
@@ -184,10 +184,10 @@ class Bolt:
                 self.conditions, 
                 tree
             )
-            if loc == "text":
-                self.res += t.gen_text()+"\n"
-            elif loc == "rodata":
+            if rodata:
                 self.res += t.gen_rodata()+"\n"
+            else:
+                self.res += t.gen_text()+"\n"
 
         self.res += "\treturn ({} + {}){};\n".format(self.base_score, " + ".join("w{}".format(i) for i in range(len(self.trees))), " >> {}".format(self.shift) if self.shift != 0 else "")
         self.res += "}\n"
