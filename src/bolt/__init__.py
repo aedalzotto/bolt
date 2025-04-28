@@ -3,12 +3,13 @@ from .bolt import Bolt
 
 def bolt():
     parser = ArgumentParser(description="Boost Learning Transpiler")
-    parser.add_argument("INPUT",                    help="Input JSON")
-    parser.add_argument("-o", "--output",           help="Output file   (default: INPUT.c)",      default=None)
-    parser.add_argument("-f", "--function",         help="Function name (default: INPUT)",        default=None)
-    parser.add_argument("-q", "--quantize-leaves",  help="Leaf quantization scalar (power of 2)", default=None)
-    parser.add_argument("-c", "--collapse-dummies", help="Convert dummies to labels",      action="store_true")
-    parser.add_argument("-m", "--minimize-int",     help="Minimize integer sizes",         action="store_true")
+    parser.add_argument("INPUT",                       help="Input JSON")
+    parser.add_argument("-o", "--output",              help="Output file   (default: INPUT.c)",      default=None)
+    parser.add_argument("-f", "--function",            help="Function name (default: INPUT)",        default=None)
+    parser.add_argument("-q", "--quantize-leaves",     help="Leaf quantization scalar (power of 2)", default=None)
+    parser.add_argument("-c", "--collapse-dummies",    help="Convert dummies to labels",      action="store_true")
+    parser.add_argument("-m", "--minimize-int",        help="Minimize integer sizes",         action="store_true")
+    parser.add_argument("-l", "--linear-quantization", help="Quantize features using offset", action="store_true")
     args = parser.parse_args()
 
     model_name = args.INPUT.split('.')[0]
@@ -28,6 +29,9 @@ def bolt():
 
     if args.minimize_int:
         bolt.minimize_int()
+
+    if args.linear_quantization:
+        bolt.linear_quantization()
     
     bolt.generate(args.function)
     bolt.write(args.output)
