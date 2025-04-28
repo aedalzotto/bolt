@@ -143,3 +143,15 @@ To enable integer minimization, run:
 ```
 bolt input.json -m
 ```
+
+### Linear feature quantization
+
+XGBoost performs comparison to trained feature weights.
+The range of values of a comparison is, therefore, defined at training time.
+It is possible to decrease the magnitude of a weight by subtracting an offset.
+This can potentially decrease the feature size.
+
+To enable linear quantization, run:
+```
+bolt input.json -l
+```
