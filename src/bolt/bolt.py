@@ -21,6 +21,8 @@ class Bolt:
             for j, idx in enumerate(tree["split_indices"]):
                 if self.feature_types[idx] == "bool":
                     tree["split_conditions"][j] = 1
+                elif self.feature_types[idx] == "int":
+                    tree["split_conditions"][j] = int(tree["split_conditions"][j])
 
     def quantize_leaves(self, scalar):
         self.return_type = "int"
