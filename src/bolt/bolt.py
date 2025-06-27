@@ -48,15 +48,19 @@ class Bolt:
 
     def collapse_dummies(self):
         pop_idx = []
+        dummy_features = {}
+        idx_skew = 0
         for i, type in enumerate(self.feature_types):
             if type == "bool":
                 dummy = "".join(self.feature_names[i].split("_")[:-1])
                 val = int(self.feature_names[i].split("_")[-1])
                 if dummy in self.feature_names:
-                    feature_index = self.feature_names.index(dummy)
+                    idx_skew += 1
+                    feature_index = dummy_features[dummy]
                     pop_idx.append(i)
                 else:
-                    feature_index = i
+                    feature_index = (i - idx_skew)
+                    dummy_features[dummy] = feature_index
                     self.feature_types[i] = "int"
                     self.internal_type[i] = "int"
                     self.feature_names[i] = dummy
