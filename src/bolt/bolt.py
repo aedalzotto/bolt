@@ -12,13 +12,12 @@ class Bolt:
         self.feature_types = [x if x != "i" else "bool" for x in model["learner"]["feature_types"]]
         self.internal_type = [x if x != "i" else "bool" for x in model["learner"]["feature_types"]]
         self.offset        = [0 for x in model["learner"]["feature_types"]]
-        self.operator      = ["<" if x != "bool" else "==" for x in self.feature_types]
+        self.operator      = ["<" if x != "bool" else "!=" for x in self.feature_types]
         self.return_type   = "float"
         self.shift         = 0
 
         self.trees = model["learner"]["gradient_booster"]["model"]["trees"]
         for tree in self.trees:
-            del tree["base_weights"]
             del tree["categories"]
             del tree["categories_nodes"]
             del tree["categories_segments"]
@@ -44,7 +43,7 @@ class Bolt:
         for tree in self.trees:
             for i, child in enumerate(tree["left_children"]):
                 if child == -1:
-                    tree["split_conditions"][i] = round(tree["split_conditions"][i] * int(scalar))
+                    tree["base_weights"][i] = round(tree["base_weights"][i] * int(scalar))
 
     def collapse_dummies(self):
         pop_idx = []
