@@ -7,6 +7,7 @@ class Tree:
         self.id               = tree["id"]
         self.split_indices    = tree["split_indices"]
         self.split_conditions = tree["split_conditions"]
+        self.base_weights     = tree["base_weights"]
         self.left_children    = tree["left_children"]
         self.right_children   = tree["right_children"]
         self.cond_indices     = tree["cond_indices"]
@@ -28,7 +29,7 @@ class Tree:
             return "{}w{} = {};".format(
                 tab,
                 self.id,
-                self.split_conditions[index]
+                self.base_weights[index]
             )
         
         # Otherwise is split
