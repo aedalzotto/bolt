@@ -1,5 +1,5 @@
 class Tree:
-    def __init__(self, feature_names, leaf_type, operator, conditions, tree):
+    def __init__(self, feature_names, leaf_type, operator, conditions, tree, skip_null=False):
         self.feature_names    = feature_names
         self.leaf_type        = leaf_type
         self.operator         = operator
@@ -12,6 +12,7 @@ class Tree:
         self.right_children   = tree["right_children"]
         self.cond_indices     = tree["cond_indices"]
         self.default_left     = tree["default_left"]
+        self.skip_null        = skip_null
 
     def gen_text(self):
         ret  = "\t{} w{};\n".format(self.leaf_type, self.id)
@@ -35,11 +36,14 @@ class Tree:
         
         # Otherwise is split
         right = self.right_children[index]
-        return "{}if ({} {} NULL {} *{} {} {}) {{\n{}\n{}}} else {{\n{}\n{}}}".format(
+        return "{}if ({}{} {} {}) {{\n{}\n{}}} else {{\n{}\n{}}}".format(
             tab,
-            self.feature_names[self.split_indices[index]],
-            "==" if self.default_left[index] else "!=",
-            "||" if self.default_left[index] else "&&",
+            "" if self.skip_null else
+            "{} {} NULL {} *".format(
+                self.feature_names[self.split_indices[index]],
+                "==" if self.default_left[index] else "!=",
+                "||" if self.default_left[index] else "&&"
+            ),
             self.feature_names[self.split_indices[index]],
             self.operator[self.split_indices[index]],
             self.split_conditions[index],

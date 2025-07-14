@@ -11,6 +11,7 @@ def bolt():
     parser.add_argument("-m", "--minimize-int",        help="Minimize integer sizes",                                  action="store_true")
     parser.add_argument("-l", "--linear-quantization", help="Quantize features using offset (implies --minimize-int)", action="store_true")
     parser.add_argument("-r", "--rodata-conditions",   help="Place split conditions in rodata",                        action="store_true")
+    parser.add_argument("-n", "--skip-null",           help="Skip null-value checks",                                  action="store_true")
     args = parser.parse_args()
 
     model_name = args.INPUT.split('.')[0]
@@ -34,5 +35,5 @@ def bolt():
     if args.linear_quantization:
         bolt.linear_quantization()
     
-    bolt.generate(args.function, rodata=args.rodata_conditions)
+    bolt.generate(args.function, rodata=args.rodata_conditions, skip_null=args.skip_null)
     bolt.write(args.output)

@@ -136,7 +136,7 @@ class Bolt:
                         val_index = len(self.conditions[self.feature_names[idx]]) - 1
                     tree["cond_indices"][j] = val_index
 
-    def generate(self, function, rodata=False):
+    def generate(self, function, rodata=False, skip_null=False):
         self.__build_rodata()
 
         self.res  = "#pragma once\n"
@@ -146,7 +146,7 @@ class Bolt:
 
         if self.quantized:
             for i, offset in enumerate(self.offset):
-                if offset != 0:        
+                if offset != 0:
                     self.res += "#define OFFSET_{} {}\n".format(
                         self.feature_names[i],
                         offset
@@ -167,8 +167,9 @@ class Bolt:
             function, 
             ", ".join(
                 [
-                    "const {} *{}".format(
+                    "const {} {}{}".format(
                         self.internal_type[i], 
+                        "" if skip_null else "*",
                         fname
                     )
                     for i, fname in enumerate(list(dict.fromkeys(self.feature_names)))
@@ -182,7 +183,8 @@ class Bolt:
                 self.return_type, 
                 self.operator, 
                 self.conditions, 
-                tree
+                tree,
+                skip_null
             )
             if rodata:
                 self.res += t.gen_rodata()+"\n"
