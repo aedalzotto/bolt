@@ -16,6 +16,10 @@ class Bolt:
         self.return_type   = "float"
         self.shift         = 0
 
+        for i, name in enumerate(self.feature_names):
+            if name[0].isdigit():
+                self.feature_names[i] = "_"+name
+
         self.trees = model["learner"]["gradient_booster"]["model"]["trees"]
         for tree in self.trees:
             del tree["categories"]
