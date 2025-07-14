@@ -11,10 +11,11 @@ class Bolt:
         self.feature_names = model["learner"]["feature_names"]
         self.feature_types = [x if x != "i" else "bool" for x in model["learner"]["feature_types"]]
         self.internal_type = [x if x != "i" else "bool" for x in model["learner"]["feature_types"]]
-        self.offset        = [0 for x in model["learner"]["feature_types"]]
+        self.offset        = [0]*len(model["learner"]["feature_types"])
         self.operator      = ["<" if x != "bool" else "!=" for x in self.feature_types]
         self.return_type   = "float"
         self.shift         = 0
+        self.quantized     = False
 
         for i, name in enumerate(self.feature_names):
             if name[0].isdigit():
@@ -26,7 +27,6 @@ class Bolt:
             del tree["categories_nodes"]
             del tree["categories_segments"]
             del tree["categories_sizes"]
-            del tree["default_left"]
             del tree["loss_changes"]
             del tree["parents"]
             del tree["split_type"]
@@ -93,11 +93,14 @@ class Bolt:
                     nbits = 0
                 nbits = min(i for i in [64,32,16,8] if i >= nbits)
                 self.internal_type[i] = "{}int{}_t".format("u" if min_val >= 0 else "", nbits)
+                self.feature_types[i] = "{}int{}_t".format("u" if min_val >= 0 else "", nbits)
 
     def linear_quantization(self):
-        for i, type in enumerate(self.internal_type):
+        for i, type in enumerate(self.feature_types):
             if "int" in type and type not in ["int8_t", "uint8_t"]:
                 values = [tree["split_conditions"][j] for tree in self.trees for j, idx in enumerate(tree["split_indices"]) if idx == i and tree["left_children"][j] != -1]
+                if len(values) == 0:
+                    continue
                 min_val = min(values) - 1
                 max_val = max(values)
                 interval = max_val - min_val
@@ -107,11 +110,13 @@ class Bolt:
                     nbits = 0
                 nbits = min(i for i in [64,32,16,8] if i >= nbits)
                 self.internal_type[i] = "{}int{}_t".format("u" if min_val >= 0 else "", nbits)
-                self.offset[i] = min_val
-                for tree in self.trees:
-                    for j, idx in enumerate(tree["split_indices"]):
-                        if idx == i and tree["left_children"][j] != -1:
-                            tree["split_conditions"][j] = tree["split_conditions"][j] - min_val
+                if (self.internal_type[i] != self.feature_types[i]):
+                    self.quantized = True
+                    self.offset[i] = min_val
+                    for tree in self.trees:
+                        for j, idx in enumerate(tree["split_indices"]):
+                            if idx == i and tree["left_children"][j] != -1:
+                                tree["split_conditions"][j] = tree["split_conditions"][j] - min_val
     
     def __build_rodata(self):
         self.conditions    = {}
@@ -134,14 +139,19 @@ class Bolt:
     def generate(self, function, rodata=False):
         self.__build_rodata()
 
-        self.res  = "#include <stdbool.h>\n"
-        self.res += "#include <stdint.h>\n\n"
+        self.res  = "#pragma once\n"
+        self.res += "#include <stdint.h>\n"
+        self.res += "#include <stdbool.h>\n"
+        self.res += "#include <stddef.h>\n\n"
 
-        self.res += "#define MIN(a, b) ((a) < (b) ? (a) : (b))\n"
-        self.res += "#define MAX(a, b) ((a) > (b) ? (a) : (b))\n"
-        self.res += "#define UINT8_MIN 0\n"
-        self.res += "#define UINT16_MIN 0\n"
-        self.res += "#define UINT32_MIN 0\n\n"
+        if self.quantized:
+            for i, offset in enumerate(self.offset):
+                if offset != 0:        
+                    self.res += "#define OFFSET_{} {}\n".format(
+                        self.feature_names[i],
+                        offset
+                    )
+            self.res += "\n"
 
         if rodata:
             for i, name in enumerate(self.feature_names):
@@ -157,31 +167,14 @@ class Bolt:
             function, 
             ", ".join(
                 [
-                    "{} {}{}".format(
-                        self.feature_types[i], 
-                        "f" if self.feature_types[i] != self.internal_type[i] else "", 
+                    "const {} *{}".format(
+                        self.internal_type[i], 
                         fname
                     )
                     for i, fname in enumerate(list(dict.fromkeys(self.feature_names)))
                 ]
             )
         )
-
-        quantized = False
-        for i in range(len(self.feature_names)):
-            if self.feature_types[i] != self.internal_type[i]:
-                quantized = True
-                self.res += "\t{} {} = MIN(MAX({}_MIN, f{} - {}), {}_MAX);\n".format(
-                    self.internal_type[i], 
-                    self.feature_names[i], 
-                    self.internal_type[i].split("_")[0].upper(), 
-                    self.feature_names[i], 
-                    self.offset[i],
-                    self.internal_type[i].split("_")[0].upper()
-                )
-
-        if quantized:
-            self.res += "\n"
 
         for tree in self.trees:
             t = Tree(
