@@ -11,6 +11,7 @@ class Tree:
         self.left_children    = tree["left_children"]
         self.right_children   = tree["right_children"]
         self.cond_indices     = tree["cond_indices"]
+        self.default_left     = tree["default_left"]
 
     def gen_text(self):
         ret  = "\t{} w{};\n".format(self.leaf_type, self.id)
@@ -34,8 +35,11 @@ class Tree:
         
         # Otherwise is split
         right = self.right_children[index]
-        return "{}if ({} {} {}) {{\n{}\n{}}} else {{\n{}\n{}}}".format(
+        return "{}if ({} {} NULL {} *{} {} {}) {{\n{}\n{}}} else {{\n{}\n{}}}".format(
             tab,
+            self.feature_names[self.split_indices[index]],
+            "==" if self.default_left[index] else "!=",
+            "||" if self.default_left[index] else "&&",
             self.feature_names[self.split_indices[index]],
             self.operator[self.split_indices[index]],
             self.split_conditions[index],
@@ -52,13 +56,16 @@ class Tree:
             return "{}w{} = {};".format(
                 tab,
                 self.id,
-                self.split_conditions[index]
+                self.base_weights[index]
             )
         
         # Otherwise is split
         right = self.right_children[index]
-        return "{}if ({} {} cond_{}[{}]) {{\n{}\n{}}} else {{\n{}\n{}}}".format(
+        return "{}if ({} {} NULL {} *{} {} cond_{}[{}]) {{\n{}\n{}}} else {{\n{}\n{}}}".format(
             tab,
+            self.feature_names[self.split_indices[index]],
+            "==" if self.default_left[index] else "!=",
+            "||" if self.default_left[index] else "&&",
             self.feature_names[self.split_indices[index]],
             self.operator[self.split_indices[index]],
             self.feature_names[self.split_indices[index]],
