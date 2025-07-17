@@ -87,7 +87,10 @@ class Bolt:
                     min_val = min(values)
                     max_val = max(values)
                     max_val = max(abs(min_val), max_val)
-                    nbits = ceil(log2(max_val)) + (1 if min_val < 0 else 0)
+                    try:
+                        nbits = ceil(log2(max_val)) + (1 if min_val < 0 else 0)
+                    except:
+                        nbits = 0
                 else:
                     min_val = 0
                     nbits = 0
