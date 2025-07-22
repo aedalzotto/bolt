@@ -65,11 +65,14 @@ class Tree:
         
         # Otherwise is split
         right = self.right_children[index]
-        return "{}if ({} {} NULL {} *{} {} cond_{}[{}]) {{\n{}\n{}}} else {{\n{}\n{}}}".format(
+        return "{}if ({}{} {} cond_{}[{}]) {{\n{}\n{}}} else {{\n{}\n{}}}".format(
             tab,
-            self.feature_names[self.split_indices[index]],
-            "==" if self.default_left[index] else "!=",
-            "||" if self.default_left[index] else "&&",
+            "" if self.skip_null else
+            "{} {} NULL {} *".format(
+                self.feature_names[self.split_indices[index]],
+                "==" if self.default_left[index] else "!=",
+                "||" if self.default_left[index] else "&&"
+            ),
             self.feature_names[self.split_indices[index]],
             self.operator[self.split_indices[index]],
             self.feature_names[self.split_indices[index]],
